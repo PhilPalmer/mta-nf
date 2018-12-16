@@ -18,11 +18,11 @@
  *   along with MTA-NF.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* 
+/*
  * Main Mta-NF pipeline script
  *
  * @authors
- * Miquel Orobitg <miquelorobitg@gmail.com> 
+ * Miquel Orobitg <miquelorobitg@gmail.com>
  */
 
 params.seq = "$baseDir/tutorial/12asA_1atiA.fasta"
@@ -32,7 +32,8 @@ params.score = 'sp'
 params.output = './results'
 params.gop = -11
 params.gep = -1
-params.matrix = "blosum62mt" 
+params.matrix = "blosum62mt"
+params.skip_tree = false
 
 
 log.info "MTA - N F  ~  version 1.3"
@@ -74,11 +75,11 @@ process make_tree {
     input:
     file fasta_file
     each ntree from 0..params.ntree-1
-    
+
     output:
     file '*.dnd' into tree mode flatten
     file '*.dnd' into tree_result
-      
+
     script:
 
     """
@@ -97,7 +98,7 @@ if ( params.msa=='t_coffee' ){
 
 		output:
 		file '*.lib' into tc_lib
-	
+
 		script:
 		"""
 		fileName=\$(basename "${fasta_file}")
@@ -106,13 +107,13 @@ if ( params.msa=='t_coffee' ){
 		t_coffee ${fasta_file} -lib_only -out_lib \$baseName.lib -n_core=${task.cpus}
 		"""
 	}
-	
+
 	process align_tree {
 	    input:
 	    file fasta_file
 	    file tc_lib from tc_lib
 	    file t from tree
-	    
+
 
 	    output:
 	    file '*.aln' into aln mode flatten
@@ -164,8 +165,8 @@ else {
 		echo "Q" >> \${baseName}.tmp
 
 		retree < \${baseName}.tmp
-	
-		clustalo -i ${fasta_file} --guidetree-in=\${t2} --outfmt=fa --threads=${task.cpus} -o \$baseName.aln	
+
+		clustalo -i ${fasta_file} --guidetree-in=\${t2} --outfmt=fa --threads=${task.cpus} -o \$baseName.aln
 	    """
 
 	}
@@ -190,7 +191,7 @@ process score_tree {
         sc=`t_coffee -other_pg fastal -i ${a} --eval_aln -g ${params.gop} -e ${params.gep} -a --mat ${params.matrix} | grep Score: | cut -d' ' -f2`
         echo "\$baseName \$sc" > \${baseName}.sc
     """
-    
+
     else if( params.score == 'normd' )
 
     """
@@ -210,7 +211,7 @@ process score_tree {
 	sc=`cat \${baseName}.tcs | grep SCORE= | cut -d'=' -f2`
 	echo "\$baseName \$sc" > \${baseName}.sc
     """
-    
+
 }
 
 
@@ -257,6 +258,35 @@ process evaluate_scores {
 
 }
 
+
+
+process make_tree {
+
+  publishDir "${params.output}", mode: 'copy'
+  container 'biopython/biopython:latest'
+
+  when:
+  !params.skip_tree
+
+  input:
+  file dnd from res_tree
+
+  output:
+  file "*.png" into results
+
+  script:
+  """
+  #!/usr/bin/env python
+
+  import pylab
+  from Bio import Phylo
+  tree = Phylo.read($dnd, 'newick')
+  Phylo.draw(tree)
+  pylab.show()
+  pylab.savefig('tree.png')
+  """
+}
+
 res_sc.subscribe { it ->
     log.info "Copying results log file to results: ${result_path}/${it.name}"
     it.copyTo(result_path)
@@ -271,6 +301,3 @@ res_aln.subscribe { it ->
     log.info "Copying the alignment to results: ${result_path}/${it.name}"
     it.copyTo(result_path)
     }
-
-
-
