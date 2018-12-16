@@ -33,7 +33,7 @@ params.output = './results'
 params.gop = -11
 params.gep = -1
 params.matrix = "blosum62mt"
-params.skip_tree = false
+params.skip_plot_tree = false
 
 
 log.info "MTA - N F  ~  version 1.3"
@@ -224,7 +224,7 @@ process evaluate_scores {
 
     output:
     file "*.sc" into res_sc
-    file "*.dnd" into res_tree
+    file "*.dnd" into res_tree, plot_tree
     file "*.aln" into res_aln
 
     script:
@@ -260,7 +260,7 @@ process evaluate_scores {
 
 
 
-process make_tree {
+process plot_tree {
 
   publishDir "${params.output}", mode: 'copy'
   container 'biopython/biopython:latest'
@@ -269,7 +269,7 @@ process make_tree {
   !params.skip_tree
 
   input:
-  file dnd from res_tree
+  file dnd from plot_tree
 
   output:
   file "*.png" into results
@@ -280,7 +280,7 @@ process make_tree {
 
   import pylab
   from Bio import Phylo
-  tree = Phylo.read($dnd, 'newick')
+  tree = Phylo.read("$dnd", 'newick')
   Phylo.draw(tree)
   pylab.show()
   pylab.savefig('tree.png')
